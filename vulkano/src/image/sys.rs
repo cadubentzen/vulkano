@@ -1326,6 +1326,10 @@ impl RawImage {
                 }
                 _ => unreachable!("image has more than 4 memory planes??"),
             }
+
+            // DRM format modifier images use MemoryPlane aspects, not format aspects.
+            // Return early to avoid the format_aspects check below.
+            return Ok(());
         } else if format_aspects.contains(ImageAspects::DEPTH | ImageAspects::STENCIL) {
             // Follows from the combination of these three VUIDs. See:
             // https://github.com/KhronosGroup/Vulkan-Docs/issues/1942
@@ -1410,9 +1414,14 @@ impl RawImage {
         // VUID-vkGetImageSubresourceLayout-format-01582
         if !format_aspects.contains(aspect.into()) {
             return Err(Box::new(ValidationError {
-                context: "array_layer".into(),
-                problem: "is greater than the number of array layers in the image".into(),
-                vuids: &["VUID-vkGetImageSubresourceLayout-arrayLayer-01717"],
+                context: "aspect".into(),
+                problem: "is not a valid aspect for the format of this image".into(),
+                vuids: &[
+                    "VUID-vkGetImageSubresourceLayout-format-08886",
+                    "VUID-vkGetImageSubresourceLayout-format-04462",
+                    "VUID-vkGetImageSubresourceLayout-format-04463",
+                    "VUID-vkGetImageSubresourceLayout-format-04464",
+                ],
                 ..Default::default()
             }));
         }
@@ -3052,11 +3061,14 @@ impl ImageCreateInfo {
                 .plane_layouts(plane_layouts_vk)
         });
 
-        let drm_format_modifier_list_vk = (!self.drm_format_modifier_plane_layouts.is_empty())
-            .then(|| {
-                ash::vk::ImageDrmFormatModifierListCreateInfoEXT::default()
-                    .drm_format_modifiers(&self.drm_format_modifiers)
-            });
+        // LIST mode: use when we have modifiers but NO plane layouts (driver picks from list)
+        // Fix: was incorrectly checking drm_format_modifier_plane_layouts.is_empty() == false
+        let drm_format_modifier_list_vk = (!self.drm_format_modifiers.is_empty()
+            && self.drm_format_modifier_plane_layouts.is_empty())
+        .then(|| {
+            ash::vk::ImageDrmFormatModifierListCreateInfoEXT::default()
+                .drm_format_modifiers(&self.drm_format_modifiers)
+        });
 
         let external_memory_vk = (!self.external_memory_handle_types.is_empty()).then(|| {
             ash::vk::ExternalMemoryImageCreateInfo::default()
