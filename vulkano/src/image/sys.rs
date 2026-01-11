@@ -3052,8 +3052,8 @@ impl ImageCreateInfo {
                 .plane_layouts(plane_layouts_vk)
         });
 
-        let drm_format_modifier_list_vk = (!self.drm_format_modifier_plane_layouts.is_empty())
-            .then(|| {
+        let drm_format_modifier_list_vk =
+            (plane_layouts_vk.is_empty() && !self.drm_format_modifiers.is_empty()).then(|| {
                 ash::vk::ImageDrmFormatModifierListCreateInfoEXT::default()
                     .drm_format_modifiers(&self.drm_format_modifiers)
             });
