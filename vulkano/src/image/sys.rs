@@ -1326,6 +1326,10 @@ impl RawImage {
                 }
                 _ => unreachable!("image has more than 4 memory planes??"),
             }
+
+            // DRM format modifier images use MemoryPlane aspects, not format aspects.
+            // Return early to avoid the format_aspects check below.
+            return Ok(());
         } else if format_aspects.contains(ImageAspects::DEPTH | ImageAspects::STENCIL) {
             // Follows from the combination of these three VUIDs. See:
             // https://github.com/KhronosGroup/Vulkan-Docs/issues/1942
